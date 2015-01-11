@@ -27,6 +27,8 @@
 
       var CommentList = React.createClass({
         render: function() {
+          // author(props) はComment componentに対する引数みたいな感じ。Comment componentの本質であるコメントテキストは
+          // <Comment></Comment> この中に書いていく感じか。
           return (
             <div className="commentList">
               <Comment author="Pete Hunt">
@@ -44,8 +46,9 @@
       var Comment = React.createClass({
         // By surrounding a JavaScript expression in braces inside JSX (as either an attribute or child),
         // you can drop text or React components into the tree.
-        // We access named attributes passed to the component as keys on this.props
-        // and any nested elements as this.props.children.
+        // Propは外部から渡された値でそのComponentが管理している値ではないので変更してはいけません。
+        // そのComponentが変更を管理するような値の場合は明日に紹介するStateにするべきです。
+        // つまりPropはImmutableであり外部とのI/Fとなっています。
         render: function() {
           return (
             <div className="comment">
