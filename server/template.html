@@ -1,0 +1,133 @@
+<!-- http://facebook.github.io/react/docs/tutorial.html -->
+<html>
+  <head>
+    <title>Hello React</title>
+    <script src="http://fb.me/react-0.12.2.js"></script>
+    <script src="http://fb.me/JSXTransformer-0.12.2.js"></script>
+    <script src="http://code.jquery.com/jquery-1.10.0.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/showdown/0.3.1/showdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.2.1/socket.io.min.js"></script>
+  </head>
+  <body>
+    <div id="content"></div>
+    <script type="text/jsx">
+      var socket;
+      var CommentBox = React.createClass({
+        getInitialState: function() {
+          return {
+            data: [] // [{ author, text }]
+          };
+        },
+        // componentWillMount (immediately before the initial rendering occurs.) でもOK
+        // むしろ componentDidMount だと2回確実にrenderが走る
+        componentDidMount: function() {
+          var self = this;
+
+          socket = io('http://localhost:7777');
+          socket.on('reset', function(comments) {
+            comments = JSON.parse(comments);
+            console.log('comments.json reset to ', comments);
+            self.setState({ data: comments });
+          });
+          // get broadcasted data
+          socket.on('add', function(comment) {
+            console.log('comment added', comment);
+            self.setState({ data: self.state.data.concat([comment]) });
+          });
+        },
+        handleCommentSubmit: function(comment) {
+          // reduce wait time for refresh list
+          var newComments = this.state.data.concat([comment]);
+          this.setState({ data: newComments });
+
+          socket.emit('post', comment);
+        },
+        // The JSX compiler will automatically rewrite HTML tags to React.createElement(tagName)
+        // expressions and leave everything else alone.
+        render: function() {
+          return (
+            <div className="commentBox">
+              <h1>Comments</h1>
+              <CommentList data={this.state.data} />
+              <CommentForm onCommentSubmit={this.handleCommentSubmit} />
+            </div>
+          );
+        }
+      });
+
+      var CommentList = React.createClass({
+        // author(props) はComment componentに対する引数みたいな感じ。Comment componentの本質である
+        // コメントテキストは<Comment> </Comment>この中に書いていく感じか。
+        // JSONデータをDOMにmappingする手法は良く使うので覚えておく
+        render: function() {
+          var commentNodes = this.props.data.map(function(comment, index) {
+            // http://facebook.github.io/react/docs/multiple-components.html#dynamic-children
+            var uniqueKey = "comment-" + index;
+            return (
+              <Comment key={uniqueKey} author={comment.author}>
+                {comment.text}
+              </Comment>
+            );
+          });
+          return (
+            <div className="commentList">
+              {commentNodes}
+            </div>
+          );
+        }
+      });
+
+      var converter = new Showdown.converter();
+      var Comment = React.createClass({
+        // By surrounding a JavaScript expression in braces inside JSX
+        // (as either an attribute or child), you can drop text or React components into the tree.
+        // Propは外部から渡された値でそのComponentが管理している値ではないので変更してはいけません。
+        // そのComponentが変更を管理するような値の場合は明日に紹介するStateにするべきです。
+        // つまりPropはImmutableであり外部とのI/Fとなっています。
+        // This is a special API that intentionally makes it difficult to insert raw HTML
+        render: function() {
+          var rawMarkUp = converter.makeHtml(this.props.children.toString());
+          return (
+            <div className="comment">
+              <h2 className="commentAuthor">
+                {this.props.author}
+              </h2>
+              <span dangerouslySetInnerHTML={{__html: rawMarkUp}} />
+            </div>
+          );
+        }
+      });
+
+      var CommentForm = React.createClass({
+        handleSubmit: function(e) {
+          e.preventDefault();
+          var author = this.refs.author.getDOMNode().value.trim();
+          var text = this.refs.text.getDOMNode().value.trim();
+          if (! author || ! text) return;
+
+          this.props.onCommentSubmit({ author: author, text: text });
+          this.refs.author.getDOMNode().value = '';
+          this.refs.text.getDOMNode().value = '';
+          return;
+        },
+        // We use the ref attribute to assign a name to a child component and this.refs to reference the component.
+        render: function() {
+          return (
+            <form className="commentForm" onSubmit={this.handleSubmit}>
+              <input type="text" placeholder="Your Name" ref="author" />
+              <input type="text" placeholder="Say something..." ref="text" />
+              <input type="submit" placeholder="Post" />
+            </form>
+          );
+        }
+      });
+
+      // React.render() instantiates the root component, starts the framework, and injects the markup
+      // into a raw DOM element, provided as the second argument.
+      React.render(
+        <CommentBox url="comments.json" />,
+        document.getElementById('content')
+      );
+    </script>
+  </body>
+</html>
